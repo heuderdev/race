@@ -5,32 +5,37 @@ namespace App\Http\Controllers\Api;
 use App\Helper\ResponseHelper;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
-use App\Http\Requests\RegisterRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
-    public function register(RegisterRequest $request): JsonResponse
+    public function register(Request $request): JsonResponse
     {
-        $fields = $request->validated();
 
-        if (User::query()->where('email', $fields["email"])->first()) {
-            return ResponseHelper::error(message: 'Email already exists!', statusCode: 400);
-        } else {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|lowercase|email|max:255|unique:' . User::class,
+            'password' => 'required'
+        ]);
 
-            $user = User::query()->create([
-                'name' => $fields["name"],
-                'email' => $fields["email"],
-                'password' => Hash::make($fields["password"])
-            ]);
-
-            return ResponseHelper::success(message: 'User has been registered successfully!', data: (array)$user->toArray(), statusCode: 201);
+        if ($validator->fails()) {
+            Log::error($validator->errors());
+            return response()->json($validator->errors(), 422);
         }
 
+        $userCreating = User::query()->create([
+            'name' => $request["name"],
+            'email' => $request["email"],
+            'password' => Hash::make($request["password"])
+        ]);
+        Log::info('User creating' . $userCreating->toJson());
+        return response()->json('The User ' . $userCreating->email . ' creating', 201);
     }
 
     public function login(LoginRequest $request): JsonResponse
